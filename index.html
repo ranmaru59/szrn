@@ -79,18 +79,17 @@ async function runConvert() {
       body: JSON.stringify({ input: input })
     });
 
-    const raw = await res.json();
-    const data = raw.result || raw;
+const raw = await res.json();
 
-    let output;
+let output;
 
-    if (data.choices && data.choices[0]) {
-      output = data.choices[0].message.content;
-    } else if (data.error) {
-      output = "エラー: " + (data.error.message || JSON.stringify(data.error));
-    } else {
-      output = JSON.stringify(data, null, 2);
-    }
+if (raw.choices && raw.choices[0]) {
+  output = raw.choices[0].message.content;
+} else if (raw.error) {
+  output = "エラー: " + (raw.error.message || JSON.stringify(raw.error));
+} else {
+  output = JSON.stringify(raw, null, 2);
+}
 
     editor.value = output + "\n\n" + editor.value;
     localStorage.setItem("szrn_data", editor.value);
