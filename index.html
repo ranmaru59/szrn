@@ -2,322 +2,142 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>S.Z.R.N. MASTER OS</title>
+<title>SZRN OS</title>
 
 <style>
-body { margin:0; display:flex; font-family:sans-serif; background:#0f1115; color:#e6e6e6; }
-nav { width:300px; height:100vh; overflow:auto; background:#171923; padding:20px; border-right:1px solid #2a2d3a; }
-nav input, nav select, nav button {
-  width:100%; padding:8px; margin-bottom:5px;
-  background:#0f1115; color:#fff; border:1px solid #2a2d3a;
-}
-#counter { font-size:12px; color:#aaa; margin-bottom:10px; }
-main { flex:1; padding:30px; overflow:auto; }
-textarea { width:100%; height:120px; background:#000; color:#0f0; border:none; padding:10px; font-family:monospace; }
-mark { background:#ffd54f; color:#000; }
-mark.current { background:#ff9800; }
-
-#minimap {
-  position:fixed; right:10px; top:10px;
-  width:200px; max-height:80vh;
-  overflow:auto; background:#111;
-  border:1px solid #333; padding:10px;
-  font-size:11px;
+body {
+  margin: 0;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
 }
 
-#minimap div { padding:3px; cursor:pointer; border-bottom:1px solid #222; }
-#minimap div.active { background:#ff9800; color:#000; }
+/* 入力エリア */
+#input-area {
+  position: sticky;
+  top: 0;
+  background: #111;
+  padding: 10px;
+  border-bottom: 1px solid #333;
+  z-index: 999;
+}
+
+#userInput {
+  width: 80%;
+  height: 60px;
+  background: #000;
+  color: #0f0;
+  border: 1px solid #333;
+  padding: 5px;
+}
+
+#runBtn {
+  height: 60px;
+  width: 18%;
+  background: #222;
+  color: #0f0;
+  border: 1px solid #333;
+}
+
+/* メインエリア */
+#editor {
+  width: 100%;
+  height: 60vh;
+  background: #000;
+  color: #0f0;
+  border: none;
+  padding: 10px;
+}
+
+/* 検索 */
+#searchBox {
+  width: 100%;
+  height: 40px;
+  background: #111;
+  color: #0f0;
+  border: none;
+  padding: 5px;
+}
 </style>
 </head>
 
 <body>
 
-<nav>
-<select id="slotSelect"></select>
-<button onclick="newSlot()">＋ 新規</button>
-<button onclick="deleteSlot()">削除</button>
+<!-- 入力UI -->
+<div id="input-area">
+  <textarea id="userInput" placeholder="ここに入力..."></textarea>
+  <button id="runBtn" onclick="runConvert()">変換</button>
+</div>
 
-<button onclick="exportData()">⬇ エクスポート</button>
-<button onclick="importData()">⬆ インポート</button>
-<input type="file" id="fileInput" style="display:none">
+<!-- 保存エリア -->
+<textarea id="editor"></textarea>
 
-<input id="search" placeholder="検索（↑↓履歴 / Enter巡回）">
-<div id="counter">0 / 0</div>
-</nav>
-
-<main>
-<textarea id="input"></textarea>
-<button onclick="render()">変換</button>
-<div id="content"></div>
-</main>
-
-<div id="minimap"></div>
+<!-- 検索 -->
+<input id="searchBox" placeholder="検索..." onkeydown="handleSearch(event)">
 
 <script>
+/* 入力 → 保存 */
+function runConvert() {
+  const input = document.getElementById("userInput").value;
+  const editor = document.getElementById("editor");
 
-// ===== 状態 =====
-let currentSlot="slot1";
-let matches=[];
-let currentIndex=-1;
-let history=[];
-let historyIndex=-1;
+  if (!input.trim()) return;
 
-const inputBox=document.getElementById("input");
-const searchBox=document.getElementById("search");
-const counter=document.getElementById("counter");
-const minimap=document.getElementById("minimap");
-const slotSelect=document.getElementById("slotSelect");
+  editor.value = input + "\n\n" + editor.value;
+  localStorage.setItem("szrn_data", editor.value);
 
-// ===== スロット =====
-function getSlots(){
-  return JSON.parse(localStorage.getItem("szrn_slots")||'["slot1"]');
+  document.getElementById("userInput").value = "";
 }
-function saveSlots(slots){
-  localStorage.setItem("szrn_slots",JSON.stringify(slots));
+
+/* Enter送信 */
+document.getElementById("userInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    runConvert();
+  }
+});
+
+/* 検索 */
+let matches = [];
+let currentIndex = 0;
+
+function handleSearch(e) {
+  if (e.key === "Enter") {
+    const keyword = e.target.value;
+    const text = document.getElementById("editor").value;
+
+    matches = [];
+    currentIndex = 0;
+
+    let index = text.indexOf(keyword);
+    while (index !== -1) {
+      matches.push(index);
+      index = text.indexOf(keyword, index + 1);
+    }
+
+    if (matches.length > 0) {
+      jumpToMatch();
+    }
+  }
 }
-function updateSlotUI(){
-  const slots=getSlots();
-  slotSelect.innerHTML="";
-  slots.forEach(s=>{
-    const opt=document.createElement("option");
-    opt.value=s;
-    opt.textContent=s;
-    slotSelect.appendChild(opt);
-  });
-  slotSelect.value=currentSlot;
+
+function jumpToMatch() {
+  const editor = document.getElementById("editor");
+  editor.focus();
+
+  const pos = matches[currentIndex];
+  editor.setSelectionRange(pos, pos + 10);
+
+  currentIndex = (currentIndex + 1) % matches.length;
 }
-function newSlot(){
-  const name=prompt("スロット名");
-  if(!name)return;
-  const slots=getSlots();
-  slots.push(name);
-  saveSlots(slots);
-  currentSlot=name;
-  updateSlotUI();
-  clearState();
-}
-function deleteSlot(){
-  const slots=getSlots().filter(s=>s!==currentSlot);
-  saveSlots(slots);
-  currentSlot=slots[0]||"slot1";
-  updateSlotUI();
-  loadState();
-}
-slotSelect.onchange=()=>{
-  currentSlot=slotSelect.value;
-  loadState();
+
+/* 初期ロード */
+window.onload = function() {
+  const saved = localStorage.getItem("szrn_data");
+  if (saved) {
+    document.getElementById("editor").value = saved;
+  }
 };
-
-// ===== 保存 =====
-function saveState(){
-  const key=`szrn_${currentSlot}`;
-  localStorage.setItem(key,JSON.stringify({
-    input:inputBox.value,
-    search:searchBox.value,
-    history
-  }));
-  autoBackup();
-}
-
-// ===== 自動バックアップ =====
-function autoBackup(){
-  const data={};
-  for(let i=0;i<localStorage.length;i++){
-    const key=localStorage.key(i);
-    if(key.startsWith("szrn_")){
-      data[key]=localStorage.getItem(key);
-    }
-  }
-  localStorage.setItem("szrn_backup_auto",JSON.stringify({
-    time:new Date().toISOString(),
-    data
-  }));
-}
-
-// ===== 読込 =====
-function loadState(){
-  const key=`szrn_${currentSlot}`;
-  const data=JSON.parse(localStorage.getItem(key)||"{}");
-
-  inputBox.value=data.input||"";
-  history=data.history||[];
-
-  render();
-
-  if(data.search){
-    searchBox.value=data.search;
-    runSearch(data.search.toLowerCase());
-  }
-}
-
-// ===== 初期化 =====
-function clearState(){
-  inputBox.value="";
-  searchBox.value="";
-  history=[];
-  render();
-}
-
-// ===== render =====
-function render(){
-  const raw=inputBox.value;
-  let html=raw
-    .replace(/^### (.*)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.*)$/gm,'<h2>$1</h2>')
-    .replace(/^# (.*)$/gm,'<h1>$1</h1>')
-    .replace(/\n/g,'<br>');
-  document.getElementById("content").innerHTML=html;
-  saveState();
-}
-
-// ===== search =====
-function runSearch(q){
-  const content=document.getElementById("content");
-  matches=[];
-  currentIndex=-1;
-  minimap.innerHTML="";
-  content.innerHTML=content.innerHTML.replace(/<mark.*?>|<\/mark>/g,"");
-
-  if(!q){
-    counter.textContent="0 / 0";
-    saveState();
-    return;
-  }
-
-  const walker=document.createTreeWalker(content,NodeFilter.SHOW_TEXT);
-  let node;
-  while(node=walker.nextNode()){
-    if(node.nodeValue.toLowerCase().includes(q)){
-      const span=document.createElement("span");
-      span.innerHTML=node.nodeValue.replace(
-        new RegExp(q,"gi"),
-        m=>`<mark>${m}</mark>`
-      );
-      node.parentNode.replaceChild(span,node);
-    }
-  }
-
-  matches=document.querySelectorAll("mark");
-  counter.textContent=matches.length?`1 / ${matches.length}`:"0 / 0";
-
-  matches.forEach((m,i)=>{
-    const d=document.createElement("div");
-    d.textContent=`#${i+1}`;
-    d.onclick=()=>jumpTo(i);
-    minimap.appendChild(d);
-  });
-
-  if(matches.length>0) jumpTo(0);
-  saveState();
-}
-
-// ===== jump =====
-function jumpTo(i){
-  matches.forEach(m=>m.classList.remove("current"));
-  minimap.querySelectorAll("div").forEach(d=>d.classList.remove("active"));
-
-  currentIndex=i;
-  const target=matches[i];
-  target.classList.add("current");
-  minimap.children[i].classList.add("active");
-
-  target.scrollIntoView({behavior:"smooth",block:"center"});
-  counter.textContent=`${i+1} / ${matches.length}`;
-  saveState();
-}
-
-// ===== 検索イベント =====
-searchBox.addEventListener("input",function(){
-  runSearch(this.value.toLowerCase());
-});
-
-searchBox.addEventListener("keydown",function(e){
-
-  if(e.key==="Enter"){
-    e.preventDefault();
-    const q=this.value;
-
-    if(q && history[history.length-1]!==q){
-      history.push(q);
-      historyIndex=history.length;
-    }
-
-    if(!matches.length)return;
-
-    if(e.shiftKey){
-      currentIndex=(currentIndex-1+matches.length)%matches.length;
-    }else{
-      currentIndex=(currentIndex+1)%matches.length;
-    }
-
-    jumpTo(currentIndex);
-  }
-
-  if(e.key==="ArrowUp"){
-    e.preventDefault();
-    if(historyIndex>0){
-      historyIndex--;
-      this.value=history[historyIndex];
-      runSearch(this.value.toLowerCase());
-    }
-  }
-
-  if(e.key==="ArrowDown"){
-    e.preventDefault();
-    if(historyIndex<history.length-1){
-      historyIndex++;
-      this.value=history[historyIndex];
-      runSearch(this.value.toLowerCase());
-    }else{
-      historyIndex=history.length;
-      this.value="";
-    }
-  }
-
-});
-
-// ===== エクスポート =====
-function exportData(){
-  const obj={};
-  for(let i=0;i<localStorage.length;i++){
-    const key=localStorage.key(i);
-    if(key.startsWith("szrn_")){
-      obj[key]=localStorage.getItem(key);
-    }
-  }
-  const blob=new Blob([JSON.stringify(obj)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="szrn_backup.json";
-  a.click();
-}
-
-// ===== インポート =====
-function importData(){
-  document.getElementById("fileInput").click();
-}
-
-document.getElementById("fileInput").addEventListener("change",function(e){
-  const file=e.target.files[0];
-  const reader=new FileReader();
-
-  reader.onload=function(){
-    const data=JSON.parse(reader.result);
-    for(const key in data){
-      localStorage.setItem(key,data[key]);
-    }
-    alert("復元完了。再読み込みしてください");
-  };
-
-  reader.readAsText(file);
-});
-
-// ===== 起動 =====
-window.onload=()=>{
-  updateSlotUI();
-  loadState();
-};
-
 </script>
 
 </body>
