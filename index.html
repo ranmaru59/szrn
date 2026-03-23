@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>SZRN OS v1.0</title>
+
+<style>
+body {
+  margin: 0;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+}
+
+/* 入力 */
+#input-area {
+  position: sticky;
+  top: 0;
+  background: #111;
+  padding: 10px;
+  z-index: 999;
+  border-bottom: 1px solid #333;
+}
+
+#userInput {
+  width: 75%;
+  height: 60px;
+  background: #000;
+  color: #0f0;
+  border: 1px solid #333;
+}
+
+#runBtn {
+  width: 23%;
+  height: 60px;
+  background: #222;
+  color: #0f0;
+  border: 1px solid #333;
+}
+
+/* 出力 */
+#editor {
+  width: 100%;
+  height: 55vh;
+  background: #000;
+  color: #0f0;
+  border: none;
+  padding: 10px;
+}
+
+/* 検索 */
+#searchBox {
+  width: 100%;
+  height: 40px;
+  background: #111;
+  color: #0f0;
+  border: none;
+  padding: 5px;
+}
+
+#counter {
+  font-size: 12px;
+  color: #aaa;
+  padding: 5px;
+}
+
+/* ミニマップ */
+#minimap {
+  position: fixed;
+  right: 5px;
+  top: 70px;
+  width: 150px;
+  max-height: 70vh;
+  overflow: auto;
+  background: #111;
+  border: 1px solid #333;
+  font-size: 10px;
+}
+
+#minimap div {
+  padding: 2px;
+  cursor: pointer;
+}
+
+#minimap div.active {
+  background: #0f0;
+  color: #000;
+}
+</style>
+</head>
+
+<body>
+
+<div id="input-area">
+  <textarea id="userInput" placeholder="スズに入力..."></textarea>
+  <button id="runBtn" onclick="runConvert()">変換</button>
+</div>
+
+<textarea id="editor"></textarea>
+
+<input id="searchBox" placeholder="検索..." onkeydown="handleSearch(event)">
+<div id="counter"></div>
+
+<div id="minimap"></div>
+
+<script>
+
+/* ===== 思考変換（強化版） ===== */
+function szrnTransform(input) {
+  return `■ 結論
+${summarize(input)}
+
+■ 根拠
+${analyze(input)}
+
+■ 不確実性
+${estimateUncertainty(input)}
+
+■ 次アクション
+${generateAction(input)}
+`;
+}
+
+function summarize(text) {
+  return text.length > 30 ? text.slice(0,30) + "..." : text;
+}
+
+function analyze(text) {
+  return "- 内容を構造化\n- 重要要素抽出\n- 意図解析";
+}
+
+function estimateUncertainty(text) {
+  if (text.includes("たぶん") || text.includes("？")) return "中";
+  return "低";
+}
+
+function generateAction(text) {
+  return "- 分解\n- 検証\n- 実行";
+}
+
+/* ===== 入力 ===== */
+function runConvert() {
+  const input = document.getElementById("userInput").value;
+  const editor = document.getElementById("editor");
+
+  if (!input.trim()) return;
+
+  const output = szrnTransform(input);
+
+  editor.value = output + "\n\n" + editor.value;
+  localStorage.setItem("szrn_data", editor.value);
+
+  document.getElementById("userInput").value = "";
+
+  updateMinimap();
+}
+
+/* Enter送信 */
+document.getElementById("userInput").addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    runConvert();
+  }
+});
+
+/* ===== 検索強化 ===== */
+let matches = [];
+let currentIndex = 0;
+
+function handleSearch(e){
+  if(e.key === "Enter"){
+    const keyword = e.target.value;
+    const text = document.getElementById("editor").value;
+
+    matches = [];
+    currentIndex = 0;
+
+    let index = text.indexOf(keyword);
+    while(index !== -1){
+      matches.push(index);
+      index = text.indexOf(keyword, index + 1);
+    }
+
+    document.getElementById("counter").innerText =
+      matches.length ? `${currentIndex+1}/${matches.length}` : "0/0";
+
+    if(matches.length) jumpToMatch();
+  }
+}
+
+function jumpToMatch(){
+  const editor = document.getElementById("editor");
+  const pos = matches[currentIndex];
+
+  editor.focus();
+  editor.setSelectionRange(pos, pos+20);
+
+  currentIndex = (currentIndex+1) % matches.length;
+
+  document.getElementById("counter").innerText =
+    `${currentIndex+1}/${matches.length}`;
+}
+
+/* ===== ミニマップ ===== */
+function updateMinimap(){
+  const text = document.getElementById("editor").value.split("\n");
+  const map = document.getElementById("minimap");
+
+  map.innerHTML = "";
+
+  text.forEach((line, i)=>{
+    if(line.startsWith("■")){
+      const div = document.createElement("div");
+      div.innerText = line;
+      div.onclick = ()=>jumpToLine(i);
+      map.appendChild(div);
+    }
+  });
+}
+
+function jumpToLine(line){
+  const editor = document.getElementById("editor");
+  const lines = editor.value.split("\n");
+
+  let pos = 0;
+  for(let i=0;i<line;i++) pos += lines[i].length+1;
+
+  editor.focus();
+  editor.setSelectionRange(pos,pos+10);
+}
+
+/* ===== 初期ロード ===== */
+window.onload = function(){
+  const saved = localStorage.getItem("szrn_data");
+  if(saved){
+    document.getElementById("editor").value = saved;
+  }
+  updateMinimap();
+}
+
+</script>
+
+</body>
+</html>
