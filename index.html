@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>SZRN OS v2.0</title>
+<title>SZRN OS</title>
 
 <style>
 body {
@@ -15,7 +14,6 @@ body {
   font-size: 16px;
 }
 
-/* 入力 */
 #input-area {
   position: sticky;
   top: 0;
@@ -43,7 +41,6 @@ body {
   border: 1px solid #333;
 }
 
-/* 出力 */
 #editor {
   width: 100%;
   height: 60vh;
@@ -53,17 +50,6 @@ body {
   border: none;
   padding: 10px;
 }
-
-/* 検索 */
-#searchBox {
-  width: 100%;
-  height: 40px;
-  font-size: 16px;
-  background: #111;
-  color: #0f0;
-  border: none;
-  padding: 5px;
-}
 </style>
 </head>
 
@@ -71,12 +57,10 @@ body {
 
 <div id="input-area">
   <textarea id="userInput" placeholder="スズに入力..."></textarea>
-  <button id="runBtn" onclick="runConvert()">変換</button>
+  <button id="runBtn" onclick="runConvert()">実行</button>
 </div>
 
 <textarea id="editor"></textarea>
-
-<input id="searchBox" placeholder="検索...">
 
 <script>
 
@@ -97,11 +81,15 @@ async function runConvert() {
 
     const data = await res.json();
 
-    if (data.error) {
-      throw new Error(data.error);
-    }
+    let output;
 
-    const output = data.choices[0].message.content;
+    if (data.choices && data.choices[0]) {
+      output = data.choices[0].message.content;
+    } else if (data.error) {
+      output = "エラー: " + data.error;
+    } else {
+      output = JSON.stringify(data, null, 2);
+    }
 
     editor.value = output + "\n\n" + editor.value;
     localStorage.setItem("szrn_data", editor.value);
