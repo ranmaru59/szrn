@@ -1,125 +1,111 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SZRN OS</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body {
-  margin: 0;
-  background: #000;
-  color: #0f0;
-  font-family: monospace;
-  font-size: 18px;
-}
-
-#input-area {
-  position: sticky;
-  top: 0;
-  background: #111;
-  padding: 10px;
-  border-bottom: 1px solid #333;
-  display: flex;
-  gap: 8px;
-}
-
-#userInput {
-  flex: 1;
-  height: 60px;
-  font-size: 18px;
-  background: #000;
-  color: #0f0;
-  border: 1px solid #333;
-}
-
-#runBtn {
-  width: 90px;
-  font-size: 18px;
-  background: #222;
-  color: #0f0;
-  border: 1px solid #333;
-}
-
-#editor {
-  width: 100%;
-  height: 70vh;
-  font-size: 16px;
-  background: #000;
-  color: #0f0;
-  border: none;
-  padding: 10px;
-  white-space: pre-wrap;
-}
+body{background:#000;color:#0f0;font-family:sans-serif}
+.card{border:1px solid #0f0;margin:10px;padding:10px}
+textarea{width:100%;height:120px}
+button{padding:10px;margin:5px}
 </style>
 </head>
 
 <body>
 
-<div id="input-area">
-  <textarea id="userInput" placeholder="スズに入力"></textarea>
-  <button id="runBtn" onclick="runConvert()">実行</button>
+<div class="card">
+<h3>🧠 状態</h3>
+<div id="decision"></div>
+<div id="score"></div>
+<div id="persona"></div>
 </div>
 
-<textarea id="editor"></textarea>
+<div class="card">
+<h3>📊 思考</h3>
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<h3>📈 成長</h3>
+<canvas id="growthChart"></canvas>
+</div>
+
+<div class="card">
+<h3>🧬 人格</h3>
+<canvas id="personaChart"></canvas>
+</div>
+
+<div class="card">
+<h3>🛠 改善</h3>
+<pre id="suggestion"></pre>
+</div>
+
+<div class="card">
+<h3>📜 ログ</h3>
+<textarea id="log"></textarea>
+</div>
+
+<button onclick="run('テスト')">実行</button>
+<button onclick="startVoice()">🎤音声</button>
 
 <script>
-async function runConvert() {
+const URL="ここにWorkerURL";
 
-  const input = document.getElementById("userInput").value;
-  const editor = document.getElementById("editor");
+async function run(input){
+  const res = await fetch(URL,{
+    method:"POST",
+    body: JSON.stringify({input})
+  });
 
-  if (!input.trim()) return;
+  const d = await res.json();
 
-  editor.value = "実行中...\n\n" + editor.value;
+  decision.innerText=d.decision;
+  score.innerText="score:"+d.score;
+  persona.innerText=d.personaScore<0.6?"⚠️逸脱":"正常";
 
-  try {
-    const res = await fetch("https://holy-bush-8fd6.b6sp5wxppr.workers.dev", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ input: input })
-    });
+  drawChart(d.weights);
+  drawGrowth(d.growth);
+  drawPersona(d.personaLog);
 
-    const raw = await res.json();
+  suggestion.innerText=(d.suggestion||[]).join("\n");
+  log.value=JSON.stringify(d.logs,null,2);
 
-    let output;
-
-    if (raw.data?.choices?.[0]) {
-      output = raw.data.choices[0].message.content;
-    } 
-    else if (raw.data?.error) {
-      output = "APIエラー:\n" + JSON.stringify(raw.data.error, null, 2);
-    } 
-    else if (raw.error) {
-      output = "通信エラー:\n" + raw.error;
-    } 
-    else {
-      output = "不明レスポンス:\n" + JSON.stringify(raw, null, 2);
-    }
-
-    editor.value = output + "\n\n---\n\n" + editor.value;
-
-  } catch (e) {
-    editor.value = "通信例外:\n" + e.message + "\n\n" + editor.value;
-  }
-
-  document.getElementById("userInput").value = "";
+  speak(d.decision);
 }
 
-// 保存復元
-window.onload = function () {
-  const saved = localStorage.getItem("szrn_data");
-  if (saved) {
-    document.getElementById("editor").value = saved;
-  }
-};
+// 音声
+const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
+rec.lang="ja-JP";
+function startVoice(){rec.start();}
+rec.onresult=e=>run(e.results[0][0].transcript);
 
-// 保存処理
-document.getElementById("editor").addEventListener("input", function () {
-  localStorage.setItem("szrn_data", this.value);
-});
+// 音声出力
+function speak(t){
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang="ja-JP";
+  speechSynthesis.speak(u);
+}
+
+// グラフ
+function drawChart(w){
+  new Chart(chart,{type:"radar",
+    data:{labels:Object.keys(w),datasets:[{data:Object.values(w)}]}})
+}
+
+function drawGrowth(g){
+  new Chart(growthChart,{
+    type:"line",
+    data:{labels:g.map(x=>""),datasets:[{data:g.map(x=>x.score)}]}
+  })
+}
+
+function drawPersona(p){
+  new Chart(personaChart,{
+    type:"line",
+    data:{labels:p.map(x=>""),datasets:[{data:p.map(x=>x.score)}]},
+    options:{scales:{y:{min:0,max:1}}}
+  })
+}
 </script>
 
 </body>
