@@ -79,14 +79,15 @@ async function runConvert() {
       body: JSON.stringify({ input: input })
     });
 
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw.result || raw;
 
     let output;
 
     if (data.choices && data.choices[0]) {
       output = data.choices[0].message.content;
     } else if (data.error) {
-      output = "エラー: " + data.error;
+      output = "エラー: " + (data.error.message || JSON.stringify(data.error));
     } else {
       output = JSON.stringify(data, null, 2);
     }
@@ -95,7 +96,7 @@ async function runConvert() {
     localStorage.setItem("szrn_data", editor.value);
 
   } catch (e) {
-    editor.value = "エラー: " + e.message + "\n\n" + editor.value;
+    editor.value = "通信エラー: " + e.message + "\n\n" + editor.value;
   }
 
   document.getElementById("userInput").value = "";
