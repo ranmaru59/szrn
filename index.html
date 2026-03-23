@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>SZRN OS v1.1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>SZRN OS v2.0</title>
 
 <style>
 body {
@@ -10,44 +12,53 @@ body {
   background: #000;
   color: #0f0;
   font-family: monospace;
+  font-size: 16px;
 }
 
+/* 入力 */
 #input-area {
   position: sticky;
   top: 0;
   background: #111;
   padding: 10px;
   border-bottom: 1px solid #333;
+  display: flex;
+  gap: 5px;
 }
 
 #userInput {
-  width: 75%;
+  flex: 1;
   height: 60px;
+  font-size: 16px;
   background: #000;
   color: #0f0;
   border: 1px solid #333;
 }
 
 #runBtn {
-  width: 23%;
-  height: 60px;
+  width: 80px;
+  font-size: 16px;
   background: #222;
   color: #0f0;
   border: 1px solid #333;
 }
 
+/* 出力 */
 #editor {
   width: 100%;
-  height: 55vh;
+  height: 60vh;
+  font-size: 15px;
   background: #000;
   color: #0f0;
   border: none;
   padding: 10px;
 }
 
+/* 検索 */
 #searchBox {
   width: 100%;
   height: 40px;
+  font-size: 16px;
   background: #111;
   color: #0f0;
   border: none;
@@ -60,7 +71,7 @@ body {
 
 <div id="input-area">
   <textarea id="userInput" placeholder="スズに入力..."></textarea>
-  <button onclick="runConvert()">変換</button>
+  <button id="runBtn" onclick="runConvert()">変換</button>
 </div>
 
 <textarea id="editor"></textarea>
@@ -85,6 +96,10 @@ async function runConvert() {
     });
 
     const data = await res.json();
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
 
     const output = data.choices[0].message.content;
 
