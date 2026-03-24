@@ -11,31 +11,40 @@ body{
   background:#000;
   color:#0f0;
   font-family:monospace;
-  display:flex;
-  flex-direction:column;
-  height:100vh;
 }
 
-.grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  grid-template-rows:1fr 1fr 1fr;
+.container{
+  display:flex;
+  flex-direction:column;
   gap:10px;
   padding:10px;
-  flex:1;
 }
 
 .box{
   border:1px solid #0f0;
   padding:10px;
+}
+
+h3{
+  margin:0 0 5px 0;
+  font-size:14px;
+}
+
+#log{
+  max-height:150px;
   overflow:auto;
 }
 
 .bottom{
-  border-top:1px solid #0f0;
-  padding:10px;
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
   display:flex;
   gap:10px;
+  padding:10px;
+  background:#000;
+  border-top:1px solid #0f0;
 }
 
 textarea{
@@ -46,20 +55,22 @@ textarea{
 }
 
 button{
-  padding:10px;
+  width:80px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="grid">
-  <div class="box">🧠 状態<div id="status">待機中</div></div>
-  <div class="box">📊 思考<div id="thinking"></div></div>
-  <div class="box">📈 成長<div id="growth"></div></div>
-  <div class="box">🧬 人格<div id="persona"></div></div>
-  <div class="box">📜 ログ<div id="log"></div></div>
-  <div class="box">⚙ 監視<div id="monitor"></div></div>
+<div class="container">
+
+<div class="box"><h3>🧠 状態</h3><div id="status">待機中</div></div>
+<div class="box"><h3>📊 思考</h3><div id="thinking"></div></div>
+<div class="box"><h3>📈 成長</h3><div id="growth"></div></div>
+<div class="box"><h3>🧬 人格</h3><div id="persona"></div></div>
+<div class="box"><h3>📜 ログ</h3><div id="log"></div></div>
+<div class="box"><h3>⚙ 監視</h3><div id="monitor"></div></div>
+
 </div>
 
 <div class="bottom">
@@ -71,14 +82,11 @@ button{
 
 const WORKER_URL = "https://holy-bush-8fd6.b6sp5wxppr.workers.dev";
 
-let lastInput="";
 let retryCount=0;
 
 async function send(){
 
   const input = document.getElementById("input").value;
-  lastInput=input;
-
   const status = document.getElementById("status");
 
   let dots=0;
@@ -103,12 +111,10 @@ async function send(){
 
     document.getElementById("thinking").innerText=data.reply;
     document.getElementById("growth").innerText=data.growth || "-";
-    document.getElementById("persona").innerText=JSON.stringify(data.PERSONA || {});
 
     addLog("正常",data.reply);
 
     status.innerText="完了";
-
     setTimeout(()=>status.innerText="待機中",500);
 
     retryCount=0;
