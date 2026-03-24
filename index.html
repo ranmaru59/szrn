@@ -1,111 +1,166 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スズOS</title>
+
 <style>
-body{background:#000;color:#0f0;font-family:sans-serif}
-.card{border:1px solid #0f0;margin:10px;padding:10px}
-textarea{width:100%;height:120px}
-button{padding:10px;margin:5px}
+body{
+  background:#000;
+  color:#0f0;
+  font-family:monospace;
+}
+
+.box{
+  border:1px solid #0f0;
+  margin:20px;
+  padding:20px;
+}
+
+textarea{
+  width:100%;
+  height:100px;
+  background:#111;
+  color:#0f0;
+}
+
+button{
+  margin:10px;
+  padding:10px;
+}
+
+.status{
+  color:#0f0;
+}
+
+.error{
+  color:red;
+}
 </style>
 </head>
 
 <body>
 
-<div class="card">
-<h3>🧠 状態</h3>
-<div id="decision"></div>
-<div id="score"></div>
+<div class="box">
+🧠 状態
+<div id="status">待機中</div>
+</div>
+
+<div class="box">
+📊 思考
+<div id="thinking"></div>
+</div>
+
+<div class="box">
+📈 成長
+<div id="growth"></div>
+</div>
+
+<div class="box">
+🧬 人格
 <div id="persona"></div>
 </div>
 
-<div class="card">
-<h3>📊 思考</h3>
-<canvas id="chart"></canvas>
+<div class="box">
+📜 ログ
+<div id="log"></div>
 </div>
 
-<div class="card">
-<h3>📈 成長</h3>
-<canvas id="growthChart"></canvas>
+<div class="box">
+<textarea id="input" placeholder="入力"></textarea>
+<button onclick="send()">実行</button>
+<button onclick="retry()">再試行</button>
 </div>
-
-<div class="card">
-<h3>🧬 人格</h3>
-<canvas id="personaChart"></canvas>
-</div>
-
-<div class="card">
-<h3>🛠 改善</h3>
-<pre id="suggestion"></pre>
-</div>
-
-<div class="card">
-<h3>📜 ログ</h3>
-<textarea id="log"></textarea>
-</div>
-
-<button onclick="run('テスト')">実行</button>
-<button onclick="startVoice()">🎤音声</button>
 
 <script>
-const URL="holy-bush-8fd6.b6sp5wxppr.workers.dev";
 
-async function run(input){
-  const res = await fetch(URL,{
-    method:"POST",
-    body: JSON.stringify({input})
-  });
+let lastInput="";
+let retryCount=0;
 
-  const d = await res.json();
-
-  decision.innerText=d.decision;
-  score.innerText="score:"+d.score;
-  persona.innerText=d.personaScore<0.6?"⚠️逸脱":"正常";
-
-  drawChart(d.weights);
-  drawGrowth(d.growth);
-  drawPersona(d.personaLog);
-
-  suggestion.innerText=(d.suggestion||[]).join("\n");
-  log.value=JSON.stringify(d.logs,null,2);
-
-  speak(d.decision);
+function sleep(ms){
+  return new Promise(r=>setTimeout(r,ms));
 }
 
-// 音声
-const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
-rec.lang="ja-JP";
-function startVoice(){rec.start();}
-rec.onresult=e=>run(e.results[0][0].transcript);
+async function send(){
 
-// 音声出力
-function speak(t){
-  const u=new SpeechSynthesisUtterance(t);
-  u.lang="ja-JP";
-  speechSynthesis.speak(u);
+  const input = document.getElementById("input").value;
+  lastInput = input;
+
+  const status = document.getElementById("status");
+
+  let dots = 0;
+  let running = true;
+
+  const loading = setInterval(()=>{
+    dots = (dots+1)%4;
+    status.innerText = "送信中" + "●".repeat(dots);
+  },300);
+
+  try{
+
+    const res = await fetch("あなたのWorkerURL",{
+      method:"POST",
+      body:JSON.stringify({input})
+    });
+
+    const data = await res.json();
+
+    clearInterval(loading);
+
+    document.getElementById("thinking").innerText = data.reply;
+    document.getElementById("growth").innerText = data.growth;
+    document.getElementById("persona").innerText = JSON.stringify(data.PERSONA);
+
+    addLog("正常", data.reply);
+
+    status.innerText = "完了";
+
+    setTimeout(()=>{
+      status.innerText = "待機中";
+    },500);
+
+    retryCount=0;
+
+  }catch(e){
+
+    clearInterval(loading);
+
+    status.innerText = "エラー";
+    status.className="error";
+
+    addLog("エラー", e.message);
+
+    retryCount++;
+
+  }
 }
 
-// グラフ
-function drawChart(w){
-  new Chart(chart,{type:"radar",
-    data:{labels:Object.keys(w),datasets:[{data:Object.values(w)}]}})
+function retry(){
+  if(lastInput){
+    send();
+  }
 }
 
-function drawGrowth(g){
-  new Chart(growthChart,{
-    type:"line",
-    data:{labels:g.map(x=>""),datasets:[{data:g.map(x=>x.score)}]}
-  })
+function addLog(type,text){
+
+  const log = document.getElementById("log");
+
+  const div = document.createElement("div");
+
+  div.innerText = `[${type}] ${text}`;
+
+  log.prepend(div);
+
 }
 
-function drawPersona(p){
-  new Chart(personaChart,{
-    type:"line",
-    data:{labels:p.map(x=>""),datasets:[{data:p.map(x=>x.score)}]},
-    options:{scales:{y:{min:0,max:1}}}
-  })
-}
+document.getElementById("input").addEventListener("keydown",function(e){
+  if(e.key==="Enter"){
+    e.preventDefault();
+    send();
+  }
+});
+
 </script>
 
 </body>
